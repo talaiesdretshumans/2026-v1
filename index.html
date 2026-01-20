@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8"/>
+<title>Talaies pels drets humans 2026</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css">
+
+<style>
+html, body { height:100%; margin:0; background:#000; font-family:Arial,sans-serif; }
+#map { height:100vh; width:100vw; background:#000; }
+
+.map-title{
+  position:absolute; top:10px; left:50%; transform:translateX(-50%);
+  background:rgba(0,0,0,0.85); padding:10px 20px; color:#fff;
+  font-size:22px; font-weight:bold; border-radius:6px; z-index:1200;
+}
+.map-subtitle{
+  position:absolute; bottom:8px; left:8px;
+  color:#ccc; font-size:12px; z-index:1200;
+}
+
+/* Panells col·lapsables */
+.control-panel{ background:rgba(0,0,0,0.85); border-radius:6px; padding:4px; color:#fff; }
+.control-toggle{
+  cursor:pointer; text-align:center; font-size:16px; line-height:16px;
+  width:24px; height:24px; border-radius:4px; background:#222; color:#fff;
+}
+.control-content{
+  display:none; margin-top:4px; background:rgba(0,0,0,0.9);
+  padding:6px; border-radius:4px; font-size:12px;
+}
+.control-panel.open .control-content{ display:block; }
+.control-content select{ width:100%; font-size:12px; }
+
+/* Etiquetes */
+.talaia-label, .line-label{ pointer-events:none; }
+.talaia-label span{
+  color:#000;
+  font-size:12px;
+  text-shadow:
+    -2px 0 #fff, 0 2px #fff, 2px 0 #fff, 0 -2px #fff,
+    -2px -2px #fff, 2px -2px #fff, -2px 2px #fff, 2px 2px #fff;
+  white-space:nowrap;
+}
+.line-label span{
+  color:#17aeff;
+  font-size:12px;
+  text-shadow:
+    -2px 0 #fff, 0 2px #fff, 2px 0 #fff, 0 -2px #fff,
+    -2px -2px #fff, 2px -2px #fff, -2px 2px #fff, 2px 2px #fff;
+  white-space:nowrap;
+}
+
+/* Llegenda plegable */
+.legend{
+  background:rgba(0,0,0,0.85);
+  padding:10px 12px;
+  border-radius:6px;
+  font-size:13px;
+  color:#fff;
+}
+.legend-title{ font-weight:bold; margin:6px 0 4px; }
+.legend-toggle{
+  cursor:pointer; text-align:center; font-weight:bold;
+  background:#222; padding:4px 6px; border-radius:4px;
+  margin-bottom:8px; user-select:none;
+}
+.legend.collapsed .legend-content{ display:none; }
+
+.legend-circle{
+  display:inline-block;
+  width:14px; height:14px;
+  border-radius:50%;
+  border:3px solid #7a001c; /* granat */
+  background: var(--fill);
+  margin-right:6px;
+  vertical-align:middle;
+}
+.legend-square{
+  display:inline-block;
+  width:14px; height:14px;
+  border-radius:2px;
+  border:1px solid #fff;
+  background: var(--fill);
+  margin-right:6px;
+  vertical-align:middle;
+}
+.legend-swatch{
+  display:inline-block;
+  width:14px; height:14px;
+  border-radius:2px;
+  border:1px solid rgba(255,255,255,0.35);
+  background: var(--fill);
+  margin-right:6px;
+  vertical-align:middle;
+}
+.legend-line{
+  width:20px; height:4px;
+  display:inline-block; margin-right:6px;
+  border-radius:2px; vertical-align:middle;
+}
+
+/* Icona quadrada per Altres punts */
+.altres-square-icon{ background:transparent; border:none; }
+
+/* Caixa d'autoria */
+.attribution-box{
+  position:absolute;
+  bottom:8px;
+  left:8px;
+  background:rgba(0,0,0,0.85);
+  color:#fff;
+  padding:8px 10px;
+  border-radius:6px;
+  font-size:12px;
+  line-height:1.4;
+  z-index:1200;
+}
+.attribution-box a{
+  color:#fff;
+  text-decoration:underline;
+}
+
+
+/* Controls foscos (mapes base i cerca) */
+.leaflet-control-layers,
+.leaflet-control-geocoder {
+  background: rgba(0,0,0,0.85) !important;
+  color: #fff !important;
+  border-radius: 6px;
+}
+
+.leaflet-control-layers label,
+.leaflet-control-layers span,
+.leaflet-control-geocoder a,
+.leaflet-control-geocoder-form input {
+  color: #fff !important;
+}
+
+.leaflet-control-layers-separator {
+  border-top: 1px solid #555;
+}
+
+.leaflet-control-geocoder-form input {
+  background: #111 !important;
+  border: 1px solid #444 !important;
+}
+
+.leaflet-control-geocoder-icon {
+  filter: invert(1);
+}
+
+</style>
+</head>
+
+<body>
+<div class="map-title">Talaies pels drets humans 2026</div>
+<div class="map-subtitle">Autor Llorenç Guasp, 2025</div>
+
+<div class="attribution-box">
+  Autor: Llorenç Guasp, 2026<br>
+  Agraïments: Fons Mallorquí de Solidaritat i
+  <a href="https://www.torresitalaies.cat/" target="_blank" rel="noopener">www.torresitalaies.cat</a>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+<script>
+// ------------------------------
+// Utils
+// ------------------------------
+function getProp(props, keys){
+  for (const k of keys){
+    if (!props) continue;
+    const v = props[k];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+  }
+  return "";
+}
+function boolToSiNo(v){
+  if (v === true) return "si";
+  if (v === false) return "no";
+  const s = String(v).trim().toLowerCase();
+  if (s === "true" || s === "1" || s === "sí" || s === "si") return "si";
+  if (s === "false" || s === "0" || s === "no") return "no";
+  return String(v);
+}
+function buildPopupHTML(props){
+  const nom   = getProp(props, ["nom","Nom","name","Name"]);
+  const tipus = getProp(props, ["Tipus","tipus"]);
+  const estat = getProp(props, ["Estat","estat","estat_conservacio","Estat_conservacio","Estat de conservació","estat de conservació"]);
+  const pm    = getProp(props, ["participacio_mati","Participació matí","Participacio_mati"]);
+  const pc    = getProp(props, ["participacio_capvespre","Participació capvespre","Participacio_capvespre"]);
+  const img   = getProp(props, ["imatge","Imatge","image","Image"]);
+  const link  = getProp(props, ["link","Link","url","URL"]);
+
+  let html = "";
+  if (nom) html += "<b>" + nom + "</b><br>";
+  if (tipus) html += "Tipus: " + tipus + "<br>";
+  if (estat) html += "Estat de conservació: " + estat + "<br>";
+  if (pm !== "") html += "Participació matí: " + boolToSiNo(pm) + "<br>";
+  if (pc !== "") html += "Participació capvespre: " + boolToSiNo(pc) + "<br>";
+
+  if (img){
+    const u = String(img);
+    html += '<div style="margin-top:6px;">' +
+            '<a href="' + u + '" target="_blank" rel="noopener">' +
+            '<img src="' + u + '" alt="imatge" style="max-width:260px; max-height:180px; display:block; border-radius:4px;">' +
+            '</a></div>';
+  }
+  if (link){
+    const u = String(link);
+    html += '<div style="margin-top:6px;"><a href="' + u + '" target="_blank" rel="noopener">(+info)</a></div>';
+  }
+  return html || "<i>Sense informació</i>";
+}
+
+// ------------------------------
+// Mapa + panes
+// ------------------------------
+const map = L.map("map").setView([39.7, 3.0], 9);
+
+// Contaminació al fons
+const pollutionPane = map.createPane("pollutionPane");
+pollutionPane.style.zIndex = 350;
+
+// Línies entre contaminació i punts
+const linesPane = map.createPane("linesPane");
+linesPane.style.zIndex = 405;
+
+// Altres punts (no participen) / (participen)
+const altresNoPane = map.createPane("altresNoPane");  altresNoPane.style.zIndex = 410;
+const altresYesPane = map.createPane("altresYesPane"); altresYesPane.style.zIndex = 411;
+
+// Talaies (no participen) / (participen) (a dalt de tot dels punts)
+const talaiesNoPane = map.createPane("talaiesNoPane"); talaiesNoPane.style.zIndex = 420;
+const talaiesYesPane = map.createPane("talaiesYesPane"); talaiesYesPane.style.zIndex = 421;
+
+// ------------------------------
+// Bases
+// ------------------------------
+const baseDark = L.tileLayer(
+  "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+  { subdomains: "abcd", maxZoom: 19, attribution: "CARTO Dark | © OpenStreetMap contributors" }
+);
+
+const baseDefault = L.tileLayer(
+  "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+  { subdomains: "abcd", maxZoom: 19, attribution: "CARTO | © OpenStreetMap contributors" }
+).addTo(map);
+
+const ortoEsri = L.tileLayer(
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  { maxZoom: 19, attribution: "Esri World Imagery" }
+);
+
+const relleu = L.tileLayer(
+  "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+  { subdomains: "abc", maxZoom: 17, attribution: "OpenTopoMap" }
+);
+
+// ------------------------------
+// Control de capes
+// ------------------------------
+const liniesOverlay = L.featureGroup(); // es marca quan s'activa
+const baseMaps = {
+  "Mapa base (CARTO Light)": baseDefault,
+  "Mapa base (OSM Dark)": baseDark,
+  "Ortofoto (Esri World Imagery)": ortoEsri,
+  "Mapa de relleu": relleu
+};
+const overlays = {
+  "Línies de visibilitat": liniesOverlay
+};
+const layerControl = L.control.layers(baseMaps, overlays, { collapsed: true }).addTo(map);
+
+// ------------------------------
+// Estils
+// ------------------------------
+const talaiesOutline = "#7a001c";
+const colorsTalaies = {
+  "talaies - participen": "#f28c28",   // taronja interior
+  "talaies - no participen": "#9e9e9e" // gris interior
+};
+const colorsAltres = {
+  "altres - participen": "#1c6331",
+  "altres - no participen": "#6f6f6f"
+};
+const colorsLinies = {
+  "directe": "#17aeff",
+  "REVISAR": "#ff4444"
+};
+function estilLinia(f){
+  const t = f.properties ? f.properties.Tipus : null;
+  const c = colorsLinies[t] || "#ffffff";
+  const dash = t === "REVISAR" ? "6,6" : null;
+  return { pane: "linesPane", color: c, weight: 3, opacity: 0.9, dashArray: dash };
+}
+
+// ------------------------------
+// Estat global
+// ------------------------------
+let liniesData = null;
+
+let talaiesLayer = null;
+let altresLayer = null;
+let contaminacioLayer = null;
+
+const labelZoom = 11;
+let talaiaLabelMarkers = []; // {label, visible}
+let altresLabelMarkers = []; // {label, visible}
+let liniaLabelMarkers = [];
+
+let talaiaEntries = []; // {territori, layer, label, visible}
+let altresEntries = []; // {territori, layer, visible}
+let territorisSet = new Set();
+
+function updateLabelsVisibility(){
+  const show = map.getZoom() >= labelZoom;
+
+  talaiaLabelMarkers.forEach(entry => {
+    const lbl = entry.label;
+    if (!lbl) return;
+    if (show && entry.visible && !map.hasLayer(lbl)) lbl.addTo(map);
+    if ((!show || !entry.visible) && map.hasLayer(lbl)) map.removeLayer(lbl);
+  });
+
+  // Etiquetes Altres punts
+  altresLabelMarkers.forEach(entry => {
+    const lbl = entry.label;
+    if (!lbl) return;
+    if (show && entry.visible && !map.hasLayer(lbl)) lbl.addTo(map);
+    if ((!show || !entry.visible) && map.hasLayer(lbl)) map.removeLayer(lbl);
+  });
+
+  liniaLabelMarkers.forEach(m => {
+    if (show && map.hasLayer(liniesOverlay) && !liniesOverlay.hasLayer(m)) liniesOverlay.addLayer(m);
+    if ((!show || !map.hasLayer(liniesOverlay)) && liniesOverlay.hasLayer(m)) liniesOverlay.removeLayer(m);
+  });
+}
+map.on("zoomend", updateLabelsVisibility);
+
+function enforceOverlayOrder(){
+  // Mantén Talaies per sobre d'Altres punts quan ambdues estan actives
+  try { if (altresLayer && map.hasLayer(altresLayer)) altresLayer.bringToBack(); } catch(e) {}
+  try { if (talaiesLayer && map.hasLayer(talaiesLayer)) talaiesLayer.bringToFront(); } catch(e) {}
+  // Contaminació ja fa bringToBack quan s'afegeix
+}
+map.on("overlayadd", enforceOverlayOrder);
+map.on("overlayremove", enforceOverlayOrder);
+
+// Filtre (multi)
+function applyTerritoriFilter(selectedValues){
+  const selected = Array.isArray(selectedValues) ? selectedValues.filter(v => v) : [];
+  const useAll = selected.length === 0;
+  const match = (t) => useAll || selected.includes(t);
+
+  // Talaies
+  talaiaEntries.forEach(e => {
+    const ok = match(e.territori);
+    e.visible = ok;
+    if (talaiesLayer){
+      if (ok && !talaiesLayer.hasLayer(e.layer)) talaiesLayer.addLayer(e.layer);
+      if (!ok && talaiesLayer.hasLayer(e.layer)) talaiesLayer.removeLayer(e.layer);
+    }
+  });
+
+  // Altres punts
+  altresEntries.forEach(e => {
+    const ok = match(e.territori);
+    e.visible = ok;
+    if (altresLayer){
+      if (ok && !altresLayer.hasLayer(e.layer)) altresLayer.addLayer(e.layer);
+      if (!ok && altresLayer.hasLayer(e.layer)) altresLayer.removeLayer(e.layer);
+    }
+  });
+
+  updateLabelsVisibility();
+
+  // Zoom a selecció
+  if (!useAll){
+    const b = L.latLngBounds([]);
+    if (talaiesLayer) talaiesLayer.eachLayer(l => { if (l.getLatLng) b.extend(l.getLatLng()); });
+    if (altresLayer) altresLayer.eachLayer(l => { if (l.getLatLng) b.extend(l.getLatLng()); });
+    if (b.isValid()) map.fitBounds(b, { padding: [30, 30] });
+  }
+}
+
+// ------------------------------
+// Carrega dades (totes)
+// ------------------------------
+Promise.all([
+  fetch("talaies_260120.geojson").then(r => r.json()),
+  fetch("altres_punts_260120.geojson").then(r => r.json()),
+  fetch("linies_vis_260120.geojson").then(r => r.json()),
+  fetch("contaminacio_lum_4326.geojson").then(r => r.json())
+]).then(([talaiesJSON, altresJSON, liniesJSON, contamJSON]) => {
+
+  // Línies (només dades, no es pinten fins que cliques)
+  liniesData = liniesJSON;
+
+  // Contaminació lumínica (OFF per defecte, sense popups)
+  const DN_COLORS = {
+    0:"#440154", 5:"#481f70", 7:"#443a82", 16:"#3b528b", 18:"#31688e", 23:"#297c8e",
+    170:"#21908d", 230:"#32c563", 235:"#85ea11", 240:"#b7f410", 250:"#e4f803", 255:"#fcd602"
+  };
+  function styleByDN(f){
+    const dn = f.properties ? f.properties.DN : null;
+    const c = DN_COLORS[dn] || "#999";
+    return { pane:"pollutionPane", color:c, weight:1, opacity:0.7, fillColor:c, fillOpacity:0.7 };
+  }
+  contaminacioLayer = L.geoJSON(contamJSON, { pane:"pollutionPane", style: styleByDN });
+  contaminacioLayer.on("add", () => { try { contaminacioLayer.bringToBack(); } catch(e) {} });
+  layerControl.addOverlay(contaminacioLayer, "Contaminació lumínica");
+
+  // Altres punts (ON per defecte)
+  altresLayer = L.geoJSON(altresJSON, {
+    pointToLayer: (f, latlng) => {
+      const s = (f.properties && f.properties.simbologia) || "";
+      const c = colorsAltres[s] || "#999";
+      const paneName = (s === "altres - participen") ? "altresYesPane" : "altresNoPane";
+      const size = 6.5;
+      return L.marker(latlng, {
+        pane: paneName,
+        icon: L.divIcon({
+          className: "altres-square-icon",
+          html: '<div style="width:'+size+'px;height:'+size+'px;background:'+c+';border:1px solid #fff;border-radius:2px;"></div>',
+          iconSize: [size, size],
+          iconAnchor: [size/2, size/2]
+        })
+      });
+    },
+    onEachFeature: (f, lyr) => {
+      const props = f.properties || {};
+      lyr.bindPopup(buildPopupHTML(props), { maxWidth: 340 });
+
+      const territori = getProp(props, ["Territori","territori"]) || "Altres";
+      
+      // etiqueta (mateixa configuració que Talaies)
+      const nomLbl = getProp(props, ["nom","Nom","name","Name"]);
+      let lbl = null;
+      if (nomLbl){
+        lbl = L.marker(lyr.getLatLng(), {
+          icon: L.divIcon({
+            className: "talaia-label",
+            html: "<span>" + nomLbl + "</span>",
+            iconSize: [0,0],
+            iconAnchor: [0, -14]
+          })
+        });
+        altresLabelMarkers.push({ label: lbl, visible: true });
+      }
+
+      territorisSet.add(territori);
+      altresEntries.push({ territori: territori, layer: lyr, visible: true });
+    }
+  }).addTo(map);
+  layerControl.addOverlay(altresLayer, "Altres punts");
+
+  // Talaies (ON per defecte) + etiquetes + click per línies
+  talaiesLayer = L.geoJSON(talaiesJSON, {
+    pointToLayer: (f, latlng) => {
+      const s = (f.properties && f.properties.simbologia) || "";
+      const c = colorsTalaies[s] || "#999";
+      const paneName = (s === "talaies - participen") ? "talaiesYesPane" : "talaiesNoPane";
+      return L.circleMarker(latlng, {
+        pane: paneName,
+        radius: 3.5,
+        fillColor: c,
+        color: talaiesOutline,
+        weight: 3,
+        opacity: 1,
+        fillOpacity: 0.95
+      });
+    },
+    onEachFeature: (f, lyr) => {
+      const props = f.properties || {};
+      lyr.bindPopup(buildPopupHTML(props), { maxWidth: 340 });
+
+      // etiqueta
+      const nom = getProp(props, ["nom","Nom","name","Name"]);
+      const territori = getProp(props, ["Territori","territori"]) || "Altres";
+      let lbl = null;
+      if (nom){
+        lbl = L.marker(lyr.getLatLng(), {
+          icon: L.divIcon({
+            className: "talaia-label",
+            html: "<span>" + nom + "</span>",
+            iconSize: [0,0],
+            iconAnchor: [0, -14]
+          })
+        });
+        talaiaLabelMarkers.push({ label: lbl, visible: true });
+      }
+
+      territorisSet.add(territori);
+      talaiaEntries.push({ territori: territori, layer: lyr, label: lbl, visible: true });
+
+      // click -> línies que toquen la talaia
+      lyr.on("click", () => {
+        if (!liniesData) return;
+
+        const pt = turf.point([lyr.getLatLng().lng, lyr.getLatLng().lat]);
+        liniesOverlay.clearLayers();
+        liniaLabelMarkers = [];
+
+        const seleccionades = (liniesData.features || []).filter(ft => turf.booleanPointOnLine(pt, ft));
+        if (!seleccionades.length){ updateLabelsVisibility(); return; }
+
+        const liniesGeo = L.geoJSON({ type:"FeatureCollection", features: seleccionades }, { style: estilLinia });
+        liniesOverlay.addLayer(liniesGeo);
+
+        // etiquetes distància
+        seleccionades.forEach(ft => {
+          const dist = ft.properties ? ft.properties.distancia_km : null;
+          if (dist === undefined || dist === null || dist === "") return;
+          const center = turf.center(ft).geometry.coordinates; // [lng,lat]
+          const lblL = L.marker([center[1], center[0]], {
+            icon: L.divIcon({
+              className: "line-label",
+              html: "<span>" + dist + " km</span>",
+              iconSize: [0,0],
+              iconAnchor: [0,0]
+            })
+          });
+          liniaLabelMarkers.push(lblL);
+        });
+
+        if (!map.hasLayer(liniesOverlay)) liniesOverlay.addTo(map);
+        updateLabelsVisibility();
+        enforceOverlayOrder();
+      });
+    }
+  }).addTo(map);
+  layerControl.addOverlay(talaiesLayer, "Talaies");
+
+  // Ajust vista inicial
+  const b = talaiesLayer.getBounds();
+  if (b && b.isValid()) map.fitBounds(b, { padding: [20,20] });
+
+  enforceOverlayOrder();
+  updateLabelsVisibility();
+
+  // Control filtre territori (multi)
+  const TerritoriFilterControl = L.Control.extend({
+    options: { position: "topleft" },
+    onAdd: function(){
+      const div = L.DomUtil.create("div", "leaflet-control control-panel");
+      let inner = '<div class="control-toggle" title="Filtrar per territori">🔎</div>';
+      inner += '<div class="control-content"><b>Filtre territori</b><br>';
+      inner += "<small>Ctrl/Cmd per seleccionar més d'un</small><br>";
+      inner += '<select id="terr-filter" multiple size="7">';
+      Array.from(territorisSet).sort().forEach(t => {
+        inner += '<option value="' + t + '">' + t + "</option>";
+      });
+      inner += "</select></div>";
+      div.innerHTML = inner;
+      L.DomEvent.disableClickPropagation(div);
+
+      const toggle = div.querySelector(".control-toggle");
+      const select = div.querySelector("#terr-filter");
+
+      toggle.onclick = (e) => {
+        L.DomEvent.stopPropagation(e);
+        L.DomEvent.preventDefault(e);
+        div.classList.toggle("open");
+      };
+      L.DomEvent.on(select, "change", (e) => {
+        L.DomEvent.stopPropagation(e);
+        const sel = Array.from(select.selectedOptions).map(o => o.value);
+        applyTerritoriFilter(sel);
+      });
+
+      return div;
+    }
+  });
+  map.addControl(new TerritoriFilterControl());
+
+}).catch(err => {
+  console.error(err);
+  alert("Error carregant dades. Revisa que tots els GeoJSON siguin al mateix directori i que estiguis obrint el mapa amb servidor local.");
+});
+
+// ------------------------------
+// Geocoder
+// ------------------------------
+L.Control.geocoder({
+  defaultMarkGeocode: true,
+  collapsed: true,
+  placeholder: "Cercar adreça..."
+}).addTo(map);
+
+// ------------------------------
+// Mesura
+// ------------------------------
+let measuring = false;
+let measurePoints = [];
+let measureLine = null;
+let measureLabel = null;
+let measureMarkers = [];
+
+function clearMeasurement(){
+  measurePoints = [];
+  if (measureLine){ map.removeLayer(measureLine); measureLine = null; }
+  if (measureLabel){ map.removeLayer(measureLabel); measureLabel = null; }
+  measureMarkers.forEach(m => map.removeLayer(m));
+  measureMarkers = [];
+}
+
+map.on("click", function(e){
+  if (!measuring) return;
+  const latlng = e.latlng;
+
+  if (measurePoints.length === 0){
+    measurePoints.push(latlng);
+    measureMarkers.push(L.circleMarker(latlng,{radius:4,color:"#fff",weight:1,fillColor:"#000",fillOpacity:1}).addTo(map));
+  } else if (measurePoints.length === 1){
+    measurePoints.push(latlng);
+    measureMarkers.push(L.circleMarker(latlng,{radius:4,color:"#fff",weight:1,fillColor:"#000",fillOpacity:1}).addTo(map));
+
+    if (measureLine) map.removeLayer(measureLine);
+    measureLine = L.polyline([measurePoints[0], measurePoints[1]], {color:"#00ffff", weight:2, dashArray:"4,4"}).addTo(map);
+
+    const from = turf.point([measurePoints[0].lng, measurePoints[0].lat]);
+    const to = turf.point([measurePoints[1].lng, measurePoints[1].lat]);
+    const distKm = turf.distance(from, to, {units:"kilometers"});
+    const distM = distKm * 1000;
+
+    const mid = L.latLng((measurePoints[0].lat+measurePoints[1].lat)/2, (measurePoints[0].lng+measurePoints[1].lng)/2);
+    if (measureLabel) map.removeLayer(measureLabel);
+    measureLabel = L.marker(mid, {
+      icon: L.divIcon({ className:"line-label", html:"<span>"+distM.toFixed(0)+" m</span>", iconSize:[0,0], iconAnchor:[0,0] })
+    }).addTo(map);
+  } else {
+    clearMeasurement();
+    measurePoints.push(latlng);
+    measureMarkers.push(L.circleMarker(latlng,{radius:4,color:"#fff",weight:1,fillColor:"#000",fillOpacity:1}).addTo(map));
+  }
+});
+
+const MeasureControl = L.Control.extend({
+  options: { position: "topleft" },
+  onAdd: function(){
+    const div = L.DomUtil.create("div", "leaflet-control control-panel");
+    div.innerHTML = '<div class="control-toggle" title="Mesurar distància">📏</div>' +
+                    '<div class="control-content"><b>Mesura</b><br>' +
+                    "<small>Fes dos clics al mapa per mesurar.<br>Torna a clicar per començar de nou.</small></div>";
+    L.DomEvent.disableClickPropagation(div);
+    const toggle = div.querySelector(".control-toggle");
+    toggle.onclick = (e) => {
+      L.DomEvent.stopPropagation(e);
+      L.DomEvent.preventDefault(e);
+      div.classList.toggle("open");
+      measuring = !measuring;
+      if (!measuring) clearMeasurement();
+    };
+    return div;
+  }
+});
+map.addControl(new MeasureControl());
+
+// ------------------------------
+// Llegenda (plegable)
+// ------------------------------
+const legend = L.control({ position: "bottomright" });
+legend.onAdd = () => {
+  const div = L.DomUtil.create("div", "legend collapsed");
+  div.innerHTML =
+    '<div class="legend-toggle">Llegenda ▸</div>' +
+    '<div class="legend-content">' +
+      '<div class="legend-title">Talaies</div>' +
+      '<span class="legend-circle" style="--fill:#f28c28;"></span>participen<br>' +
+      '<span class="legend-circle" style="--fill:#9e9e9e;"></span>no participen<br>' +
+
+      '<div class="legend-title">Altres punts</div>' +
+      '<span class="legend-square" style="--fill:#1c6331;"></span>participen<br>' +
+      '<span class="legend-square" style="--fill:#6f6f6f;"></span>no participen<br>' +
+
+      '<div class="legend-title">Visibilitat</div>' +
+      '<span class="legend-line" style="background:#17aeff;"></span>directa<br>' +
+      '<span class="legend-line" style="background:transparent;border-top:2px dashed #ff4444;"></span>revisar<br>' +
+
+      '<div class="legend-title">Contaminació lumínica</div>' +
+      '<span class="legend-swatch" style="--fill:#440154;"></span><br>' +
+      '<span class="legend-swatch" style="--fill:#481f70;"></span><br>' +
+      '<span class="legend-swatch" style="--fill:#443a82;"></span><br>' +
+      '<span class="legend-swatch" style="--fill:#3b528b;"></span><br>' +
+      '<span class="legend-swatch" style="--fill:#31688e;"></span><br>' +
+      '<span class="legend-swatch" style="--fill:#297c8e;"></span><br>' +
+      '<span class="legend-swatch" style="--fill:#21908d;"></span><br>' +
+      '<span class="legend-swatch" style="--fill:#32c563;"></span><br>' +
+      '<span class="legend-swatch" style="--fill:#85ea11;"></span><br>' +
+      '<span class="legend-swatch" style="--fill:#b7f410;"></span><br>' +
+      '<span class="legend-swatch" style="--fill:#e4f803;"></span><br>' +
+      '<span class="legend-swatch" style="--fill:#fcd602;"></span><br>' +
+    '</div>';
+
+  const toggle = div.querySelector(".legend-toggle");
+  toggle.onclick = () => {
+    div.classList.toggle("collapsed");
+    toggle.textContent = div.classList.contains("collapsed") ? "Llegenda ▸" : "Llegenda ▾";
+  };
+  L.DomEvent.disableClickPropagation(div);
+  return div;
+};
+legend.addTo(map);
+</script>
+</body>
+</html>
